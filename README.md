@@ -4,6 +4,8 @@ A high-performance, continuous-trading limit order book engine written from scra
 
 This is a personal project built to develop a deep understanding of order book internals -- how orders are stored, prioritized, matched, and cancelled -- and to explore the data structure and systems design choices that make these operations fast at scale.
 
+It is an in-process matching engine core plus a CLI harness, not a full real-time exchange service. There is no network transport, streaming infrastructure, persistence layer, or distributed runtime in this repository.
+
 ## Problem
 
 Traditional limit order book implementations suffer from three performance bottlenecks:
@@ -85,7 +87,7 @@ cargo build --release
 cargo test -p lob_core
 ```
 
-Runs 5 unit tests, 20 integration tests, 4 property-based tests (via proptest), and 1 doc-test.
+Runs 5 unit tests, 20 integration tests, and 4 property-based tests (via proptest).
 
 ### Demo
 
@@ -93,7 +95,7 @@ Runs 5 unit tests, 20 integration tests, 4 property-based tests (via proptest), 
 cargo run --release -p lob_cli -- demo --count 1000000
 ```
 
-Generates a synthetic event stream (1M commands, 30% cancel ratio) and replays it through the engine, printing trades, top-of-book, and throughput statistics.
+Generates a synthetic event stream (1M commands, 30% cancel ratio) and replays it through the engine, printing top-of-book and throughput statistics.
 
 ```
 cargo run --release -p lob_cli -- generate --count 100000 --output events.jsonl
@@ -117,6 +119,20 @@ Single-threaded, release build, Apple Silicon (M-series):
 | cancel                  |  100,000  | ~9.0M ops/sec    | ~111 ns     |
 | mixed workload          | 1,000,000 | ~6.7M ops/sec    | ~148 ns     |
 
+## Real-Time Goals
+
+The current repository focuses on the deterministic matching core: a single-process, in-memory engine with a replay/demo CLI around it. The longer-term goal is to use this core as the matching hot path inside a real-time trading system.
+
+That future system would likely add:
+
+- A low-latency ingress layer for orders and cancels (for example FIX, WebSocket, or an internal gateway).
+- A sequenced command stream so each instrument can still be processed by a single writer.
+- Durable event logging for recovery and deterministic replay.
+- Market data fanout for trades, top-of-book, and depth updates.
+- Risk checks, account controls, observability, and operational tooling around the core engine.
+
+In other words, the real-time objective is not to make the matching loop itself distributed. It is to keep the matching loop small and deterministic, then place transport, persistence, and fanout infrastructure around it.
+
 ## Design Decisions
 
 **Integer prices and quantities.** Floats introduce rounding errors and are slower for comparisons. All prices are in ticks, quantities in lots.
@@ -133,13 +149,10 @@ Single-threaded, release build, Apple Silicon (M-series):
 
 ## Correctness
 
-The following invariants are enforced and verified by property-based tests across random event sequences:
+The following properties are covered by tests:
 
-- No crossed book: after every operation, best bid < best ask.
-- FIFO within level: orders match in arrival order.
-- OrderId uniqueness: duplicate IDs are rejected.
-- No zero quantities: rejected at submission.
-- Aggregate consistency: snapshot quantities equal summed order quantities.
+- Property-based tests verify that the book never crosses, trade quantity never exceeds incoming quantity, order counts remain consistent with snapshots, and snapshot levels stay sorted with positive quantities and counts.
+- Integration tests verify FIFO within a level, duplicate `OrderId` rejection, zero-quantity rejection, cancel behavior, modify behavior, partial fills, and multi-level sweeps.
 
 ## License
 
