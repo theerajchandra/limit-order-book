@@ -119,7 +119,7 @@ Single-threaded, release build, Apple Silicon (M-series):
 | cancel                  |  100,000  | ~9.0M ops/sec    | ~111 ns     |
 | mixed workload          | 1,000,000 | ~6.7M ops/sec    | ~148 ns     |
 
-## Real-Time Goals
+## Future Roadmap
 
 The current repository focuses on the deterministic matching core: a single-process, in-memory engine with a replay/demo CLI around it. The longer-term goal is to use this core as the matching hot path inside a real-time trading system.
 
@@ -127,11 +127,11 @@ That future system would likely add:
 
 - A low-latency ingress layer for orders and cancels (for example FIX, WebSocket, or an internal gateway).
 - A sequenced command stream so each instrument can still be processed by a single writer.
-- Durable event logging for recovery and deterministic replay.
+- Durable event logging for recovery and deterministic replay, potentially backed by infrastructure such as Kafka.
 - Market data fanout for trades, top-of-book, and depth updates.
 - Risk checks, account controls, observability, and operational tooling around the core engine.
 
-In other words, the real-time objective is not to make the matching loop itself distributed. It is to keep the matching loop small and deterministic, then place transport, persistence, and fanout infrastructure around it.
+In other words, the roadmap is not to make the matching loop itself distributed. It is to keep the matching loop small and deterministic, then place transport, persistence, and fanout infrastructure around it.
 
 ## Design Decisions
 
